@@ -1,0 +1,34 @@
+<svg class="background">
+  <text id="firstLine"      x="0"   y="25"  text-anchor="start" font-family="Seville-Bold" font-size="22" fill="white" text-length="50" />
+  <text id="secondLine"     x="0"   y="50" text-anchor="start" font-family="Seville-Bold" font-size="22" fill="white" text-length="50" />
+  <text id="thirdLine"      x="0"   y="75" text-anchor="start" font-family="Seville-Bold" font-size="22" fill="white" text-length="50" />
+  
+  <section x="0" y="100" width="300" height="200">
+    <circle id="CGM-dp0"  cx="0" cy="0" r="2" fill="white" visibility="hidden" />
+    <circle id="CGM-dp1"  cx="0" cy="0" r="2" fill="white" visibility="hidden" />
+    <circle id="CGM-dp2"  cx="0" cy="0" r="2" fill="white" visibility="hidden" />
+    <circle id="CGM-dp3"  cx="0" cy="0" r="2" fill="white" visibility="hidden" />
+    <circle id="CGM-dp4"  cx="0" cy="0" r="2" fill="white" visibility="hidden" />
+    <circle id="CGM-dp5"  cx="0" cy="0" r="2" fill="white" visibility="hidden" />
+    <circle id="CGM-dp6"  cx="0" cy="0" r="2" fill="white" visibility="hidden" />
+    <circle id="CGM-dp7"  cx="0" cy="0" r="2" fill="white" visibility="hidden" />
+    <circle id="CGM-dp8"  cx="0" cy="0" r="2" fill="white" visibility="hidden" />
+    <circle id="CGM-dp9"  cx="0" cy="0" r="2" fill="white" visibility="hidden" />
+    <circle id="CGM-dp10" cx="0" cy="0" r="2" fill="white" visibility="hidden" />
+    <circle id="CGM-dp11" cx="0" cy="0" r="2" fill="white" visibility="hidden" />
+    <circle id="CGM-dp12" cx="0" cy="0" r="2" fill="white" visibility="hidden" />
+    <circle id="CGM-dp13" cx="0" cy="0" r="2" fill="white" visibility="hidden" />
+    <circle id="CGM-dp14" cx="0" cy="0" r="2" fill="white" visibility="hidden" />
+    <circle id="CGM-dp15" cx="0" cy="0" r="2" fill="white" visibility="hidden" />
+    <circle id="CGM-dp16" cx="0" cy="0" r="2" fill="white" visibility="hidden" />
+    <circle id="CGM-dp17" cx="0" cy="0" r="2" fill="white" visibility="hidden" />
+    <circle id="CGM-dp18" cx="0" cy="0" r="2" fill="white" visibility="hidden" />
+    <circle id="CGM-dp19" cx="0" cy="0" r="2" fill="white" visibility="hidden" />
+    <circle id="CGM-dp20" cx="0" cy="0" r="2" fill="white" visibility="hidden" />
+    <circle id="CGM-dp21" cx="0" cy="0" r="2" fill="white" visibility="hidden" />
+    <circle id="CGM-dp22" cx="0" cy="0" r="2" fill="white" visibility="hidden" />
+    <circle id="CGM-dp23" cx="0" cy="0" r="2" fill="white" visibility="hidden" />
+    <circle id="CGM-dp24" cx="0" cy="0" r="2" fill="white" visibility="hidden" />
+    <circle id="CGM-dp25" cx="0" cy="0" r="2" fill="white" visibility="hidden" />
+  </section>
+</svg>
