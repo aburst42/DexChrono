@@ -38,24 +38,38 @@ settingsStorage.onchange = function(evt) {
   fetchAndSendCGMData();
 }
 
-function fetchAndSendCGMData() {
-  console.log('COMPANION: fetchAndSendCGMData');
+function handleNewData(data) {
+  console.log("COMPANION: new data " + JSON.stringify(data));
+
+  if (messaging.peerSocket.readyState === messaging.peerSocket.OPEN) {
+    messaging.peerSocket.send(JSON.stringify(data));
+  }
+}
+
+function handleError(rejectionData) {
+  console.log("COMPANION: error in fetching data - " + rejectionData);
   
   if (messaging.peerSocket.readyState === messaging.peerSocket.OPEN) {
-    // If we're connected, fetch the data and send it to the app...
-    Data
-      .getAnalyzedData()
-      .then(
-        (data) => {
-          messaging.peerSocket.send(JSON.stringify(data));
-        })
-      .catch(
-        (rejectionData) => {
-          console.log("error in fetching data - " + rejectionData);
-          messaging.peerSocket.send(JSON.stringify(rejectionData));
-        });
-  } else {
-    // ...otherwise, just fetch the data, so that it is cached for later...
-    Data.getAnalyzedData();
+    messaging.peerSocket.send(rejectionData);
   }
+}
+
+function fetchAndSendCGMData() {
+  console.log('COMPANION: fetchAndSendCGMData');
+
+  // Promises can only be resolved once. If we could resolve more than once
+  // (and ensure that then gets called again), or if promises had a 'progress'
+  // callback, we could instead hide the complexity behind getAnalyzedData.
+  // Instead, we have to use the two step pattern below
+  
+  // First, we return data cached in memory, if available, right away
+  Data
+    .getAnalyzedData(true /*cacheOnly*/)
+    .then(handleNewData);
+  
+  // Next, we cue up a (possibly) long running operation to fetch
+  // fresh data from the service.
+  Data
+    .getAnalyzedData(false /*cacheOnly*/)
+    .then(handleNewData);
 }

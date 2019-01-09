@@ -1,6 +1,7 @@
 import { Auth } from "./auth";
 import { Storage } from "./storage";
 import { DataConstants } from "../common/constants";
+import * as util from "../common/utils";
 
 export function Data() {
 }
@@ -12,23 +13,22 @@ let maxCount = 26;
 let minGraphValue = 40;
 let maxGraphValue = 300;
 
-// Data shown should be at most 60 minutes old
-let requiredDataRecencyInterval = 1000 * 60 * 60;
+let storageExpirationInterval = 1000 * 60 * 30; // 30 minutes
 
 Data.storage = new Storage(
-                    Storage.cgmDataKey,         /*storageKey*/
-                    requiredDataRecencyInterval /*expirationInterval*/);
+                    Storage.cgmDataKey,       /*storageKey*/
+                    storageExpirationInterval /*expirationInterval*/);
 
 Data.clearCache = function() {
   Data.storage.clear();
 }
 
-function fetchNewData(resolve, reject) {
+function fetchNewData(resolve, reject, debugMessage) {
   Auth
     .sessionId()
     .then(
       (sessionId) => {
-        console.log('COMPANION: got sessionId, let\'s get the data...');
+        console.log('COMPANION: got sessionId ' + sessionId + ', let\'s get the data...');
 
         let url =   'https://share1.dexcom.com/ShareWebServices/Services/Publisher/ReadPublisherLatestGlucoseValues?sessionId=' + sessionId
                   + '&minutes=' + minutes
@@ -43,47 +43,54 @@ function fetchNewData(resolve, reject) {
             }
           }
         )
-        .then(function(response) {
-          return response.json();
+        .then((response) => {           
+            console.log('COMPANION: response received');
+          
+            return response.json();
         })
-        .then(function(data) {
+        .then((data) => {
+          console.log('COMPANION: json received');
+          logDebugInfo(data, debugMessage);
+          
           Data.storage.save(data);
-
           resolve(data);
+        })
+        .catch((error) => {
+          console.log('COMPANION: fetch error - ' + error);
         })
       });
 }
-// Raw data fetching
-Data.getLatest = function() {
-  let cgmData = Data.storage.load();
-  
-  if (   (!!cgmData)
-      && (cgmData.length > 0)
-      && (cgmData[0])) {
-    return new Promise(function(resolve, reject) {
-      console.log('COMPANION: sending cgmData - ' + JSON.stringify(cgmData));
-      
-      resolve(cgmData);
-      
-//      if (!isSufficientlyRecent(getTimestamp(cgmData[0]))) {
-        console.log('COMPANION: sent data to app, now fetching new data.');
-        fetchNewData(resolve, reject);
-//      }
-    });
-  } else {
-    return new Promise(function(resolve, reject) {
-      console.log('COMPANION: no data, fetching new data.');
 
-      fetchNewData(resolve, reject);
+// Raw data fetching
+Data.getData = function(cacheOnly) {
+  if (cacheOnly) {
+    let cgmData = Data.storage.load();
+
+    return new Promise(function(resolve, reject) {
+      if (   (!!cgmData)
+          && (cgmData.length > 0)
+          && (cgmData[0])) {
+        logDebugInfo(cgmData, 'cached data');
+     
+        resolve(cgmData);
+      } else {
+        // Since we're not willing to wait for fresh data, we have
+        // no data we can provide. Resolve the promise accordingly.
+        resolve({});
+      }
+    });
+  } else { // !cacheOnly
+    return new Promise(function(resolve, reject) {
+      fetchNewData(resolve, reject, 'fetching new data');
     });
   }
 }
 
 // Data analysis
-Data.getAnalyzedData = function() {
+Data.getAnalyzedData = function(cacheOnly) {
   return new Promise(function(resolve, reject) {
     Data
-      .getLatest()
+      .getData(cacheOnly)
       .then(
         (data) => {
           let result = packageErrorInfo(DataConstants.noData);
@@ -91,36 +98,31 @@ Data.getAnalyzedData = function() {
           if (   (!!data)
               && (data.length > 0) ) {
             let latestValue = data[0];
-            if (isSufficientlyRecent(getTimestamp(latestValue))) {
-              result = 
-                packageInfo(
-                  latestValue.Value,
-                  getTimestamp(latestValue),
-                  latestValue.Trend,
-                  data,
-                  DataConstants.noError);
-            } else {
-              result = packageErrorInfo(DataConstants.tooOld);
-            }
+
+            result = 
+              packageInfo(
+                latestValue.Value,
+                getTimestamp(latestValue),
+                latestValue.Trend,
+                data,
+                DataConstants.noError);
           }
 
           resolve(result);
         })
+      .catch(
+        (errorInfo) => {
+          console.log('COMPANION: error in geting data - ' + errorInfo);
+          
+          result = packageErrorInfo(DataConstants.noData, errorInfo);
+          
+          resolve(result);
+        }
+      );
   });
 }
                      
 // Utilities                    
-function isSufficientlyRecent(dataTimestamp) {
-  let result = false;
-    
-  if (   (!!dataTimestamp)
-      && ((Date.now() - dataTimestamp) <= requiredDataRecencyInterval)) {
-    result = true;
-  }
-  
-  return result;
-}
-
 function translateTrend(trend) {
   let result = 'no trend';
   
@@ -149,11 +151,11 @@ function translateError(error) {
   }
 }
 
-function packageErrorInfo(errorCode) {
-  return packageInfo(null, null, null, null, errorCode);
+function packageErrorInfo(errorCode, errorMessage) {
+  return packageInfo(null, null, null, null, errorCode, errorMessage);
 }
 
-function packageInfo(value, timestamp, trendCode, data, errorCode) {
+function packageInfo(value, timestamp, trendCode, data, errorCode, errorMessage) {
   return {
     'value': value,
     'timestamp': timestamp,
@@ -161,7 +163,7 @@ function packageInfo(value, timestamp, trendCode, data, errorCode) {
     'trendMessage': translateTrend(trendCode),
     'graphData': getGraphData(data),
     'error': errorCode,
-    'errorMessage': translateError(errorCode)
+    'errorMessage': (!!errorMessage) ? errorMessage : translateError(errorCode)
   }
 }
 
@@ -183,21 +185,6 @@ function getGraphData(data) {
     
     let crtDatum = 0;
    
-    /*
-    // Dynamic range computation - static values seem to work better...
-    let minValue = data[0].Value;
-    let maxValue = data[0].Value;
-    
-    for (crtDatum = 1; crtDatum < data.length; crtDatum++) {
-      let crtValue = data[crtDatum].Value;
-      if (crtValue < minValue) {
-        minValue = crtValue;
-      } else if (crtValue > maxValue) {
-        maxValue = crtValue;
-      }
-    }
-    */
-    
     // we add 1 to every interval to avoid the degenerate, single data point divide by 0 issue
     let valueInterval = (maxGraphValue - minGraphValue + 1);
     
@@ -212,4 +199,33 @@ function getGraphData(data) {
   }
   
   return result;
+}
+
+function getFormattedTime(date) {
+  let result = '';
+  
+  result = (util.zeroPad(date.getHours()) + ':' + util.zeroPad(date.getMinutes()) + ':' + util.zeroPad(date.getSeconds()));
+  
+  return result;
+}
+
+function logDebugInfo(data, extraMessage) {
+  console.log('COMPANION: DEBUG - START');
+  console.log('           ' + extraMessage);
+  let now = Date.now();
+  if (!data) {
+    console.log('           no data');
+    console.log('           now @ ' + getFormattedTime(new Date(now)));
+  } else if (data.length == 0) {
+    console.log('           empty data');
+    console.log('           now @ ' + getFormattedTime(new Date(now)));
+  } else {
+    let latestDatum = data[0];
+    let latestDatumDatetime = getTimestamp(latestDatum);
+    console.log('           data @ ' + getFormattedTime(new Date(latestDatumDatetime)));
+    console.log('           now @ ' + getFormattedTime(new Date(now)));
+    console.log('           delta ' + ((now - latestDatumDatetime) / 60000).toFixed(1) + ' minutes');
+  }
+  
+  console.log('COMPANION: DEBUG - END');
 }
