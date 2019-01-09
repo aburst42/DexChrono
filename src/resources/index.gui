@@ -3,7 +3,7 @@
   <text id="secondLine"     x="0"   y="50" text-anchor="start" font-family="Seville-Bold" font-size="22" fill="white" text-length="50" />
   <text id="thirdLine"      x="0"   y="75" text-anchor="start" font-family="Seville-Bold" font-size="22" fill="white" text-length="50" />
   
-  <section x="0" y="100" width="300" height="200">
+  <section x="0" y="50" width="300" height="150">
     <circle id="CGM-dp0"  cx="0" cy="0" r="2" fill="white" visibility="hidden" />
     <circle id="CGM-dp1"  cx="0" cy="0" r="2" fill="white" visibility="hidden" />
     <circle id="CGM-dp2"  cx="0" cy="0" r="2" fill="white" visibility="hidden" />

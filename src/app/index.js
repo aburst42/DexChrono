@@ -35,6 +35,7 @@ function getFormattedTime(date) {
 }
 
 let trendStrings = [
+  'unknown',
   'going UP, VERY FAST!',
   'going UP, FAST',
   'going UP',
