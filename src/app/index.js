@@ -4,6 +4,7 @@ import * as messaging from "messaging";
 import { preferences } from "user-settings";
 import * as util from "../common/utils";
 import { DataConstants } from "../common/constants";
+import { SingleFileReceiver } from "./singleFileReceiver";
 
 // Update the clock every minute
 clock.granularity = "minutes";
@@ -80,6 +81,8 @@ clock.ontick = ((evt) => {
   
   requestCGMData();
   renderTime();
+  
+  fileReceiver.processIncomingFiles();
 });
 
 
@@ -155,8 +158,11 @@ messaging.peerSocket.onclose = () => {
 messaging.peerSocket.onmessage = evt => {
   console.log(`DEVICE: app received ${evt.data}`);
 
-  let payload = JSON.parse(evt.data);
-  
+  newDataHandler(evt.data);
+}
+
+function newDataHandler(data) {
+  let payload = JSON.parse(data);
   updateCGMInfo(payload);
 }
 
@@ -165,4 +171,6 @@ function sendMessageToCompanion(message) {
     messaging.peerSocket.send(message);
   }
 }
+
+let fileReceiver = new SingleFileReceiver(DataConstants.transferFilename, newDataHandler);
 // /Messaging

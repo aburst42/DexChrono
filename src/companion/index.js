@@ -1,19 +1,23 @@
 import * as messaging from "messaging";
-import { Data } from "./data";
 import { settingsStorage} from "settings";
 import { me } from "companion";
+import { encode } from "cbor";
+import { outbox } from "file-transfer";
+
+import { Data } from "./data";
+import { DataConstants } from "../common/constants";
 
 me.wakeInterval = 300000; // wake up 5 minutes
 
 me.onwakeinterval = () => {
   console.log('COMPANION: wake up');
   
-  fetchAndSendCGMData();
+  cacheCGMData();
 }
 
 messaging.peerSocket.onopen = () => {
   console.log("COMPANION: socket open");
-  fetchAndSendCGMData();
+  cacheCGMData();
 }
 
 messaging.peerSocket.onclose = () => {
@@ -28,48 +32,41 @@ messaging.peerSocket.onmessage = (evt) => {
   console.log(`COMPANION: received data - ${evt.data}`);
   
   switch (evt.data) {
-    case 'updateCGM': { fetchAndSendCGMData(); break; }
+    case 'updateCGM': { cacheCGMData(); break; }
     default: { console.log('COMPANION: unknown command'); break; }
   }
 }
 
 settingsStorage.onchange = function(evt) {
   Data.clearCache();
-  fetchAndSendCGMData();
+  cacheCGMData();
 }
 
 function handleNewData(data) {
-  console.log("COMPANION: new data " + JSON.stringify(data));
+  let newData = JSON.stringify(data);
+  console.log("COMPANION: new data " + newData);
 
-  if (messaging.peerSocket.readyState === messaging.peerSocket.OPEN) {
-    messaging.peerSocket.send(JSON.stringify(data));
-  }
+  sendDataToDeviceFile(newData);
 }
 
-function handleError(rejectionData) {
-  console.log("COMPANION: error in fetching data - " + rejectionData);
+function sendDataToDeviceFile(data) {
+  let encodedData = encode(data);
+  let transferFilename = DataConstants.transferFilename;
   
-  if (messaging.peerSocket.readyState === messaging.peerSocket.OPEN) {
-    messaging.peerSocket.send(rejectionData);
-  }
+  outbox
+    .enqueue(transferFilename, encodedData)
+    .then(ft => {
+      console.log(`COMPANION: Transfer of '${transferFilename}' successfully queued.`);
+    })
+    .catch(function (error) {
+      throw new Error(`Failed to enqueue '${destFilename}'. Error: ${error}`);
+    });
 }
 
-function fetchAndSendCGMData() {
+function cacheCGMData() {
   console.log('COMPANION: fetchAndSendCGMData');
 
-  // Promises can only be resolved once. If we could resolve more than once
-  // (and ensure that then gets called again), or if promises had a 'progress'
-  // callback, we could instead hide the complexity behind getAnalyzedData.
-  // Instead, we have to use the two step pattern below
-  
-  // First, we return data cached in memory, if available, right away
   Data
     .getAnalyzedData(true /*cacheOnly*/)
-    .then(handleNewData);
-  
-  // Next, we cue up a (possibly) long running operation to fetch
-  // fresh data from the service.
-  Data
-    .getAnalyzedData(false /*cacheOnly*/)
     .then(handleNewData);
 }
