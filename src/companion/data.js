@@ -13,112 +13,78 @@ let maxCount = 26;
 let minGraphValue = 40;
 let maxGraphValue = 300;
 
-let storageExpirationInterval = 1000 * 60 * 30; // 30 minutes
+function fetchNewData() {
+  return new Promise(function(resolve, reject) {
+    Auth
+      .sessionId()
+      .then(
+        (sessionId) => {
+          console.log('COMPANION: got sessionId ' + sessionId + ', let\'s get the data...');
 
-Data.storage = new Storage(
-                    Storage.cgmDataKey,       /*storageKey*/
-                    storageExpirationInterval /*expirationInterval*/);
+          let url =   'https://share1.dexcom.com/ShareWebServices/Services/Publisher/ReadPublisherLatestGlucoseValues?sessionId=' + sessionId
+                    + '&minutes=' + minutes
+                    + '&maxCount=' + maxCount;
 
-Data.clearCache = function() {
-  Data.storage.clear();
-}
-
-function fetchNewData(resolve, reject, debugMessage) {
-  Auth
-    .sessionId()
-    .then(
-      (sessionId) => {
-        console.log('COMPANION: got sessionId ' + sessionId + ', let\'s get the data...');
-
-        let url =   'https://share1.dexcom.com/ShareWebServices/Services/Publisher/ReadPublisherLatestGlucoseValues?sessionId=' + sessionId
-                  + '&minutes=' + minutes
-                  + '&maxCount=' + maxCount;
-
-        fetch(
-          url,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
+          fetch(
+            url,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              }
             }
-          }
-        )
-        .then((response) => {           
-            console.log('COMPANION: response received');
-          
-            return response.json();
-        })
-        .then((data) => {
-          console.log('COMPANION: json received');
-          logDebugInfo(data, debugMessage);
-          
-          Data.storage.save(data);
-          resolve(data);
-        })
-        .catch((error) => {
-          console.log('COMPANION: fetch error - ' + error);
-        })
-      });
-}
+          )
+          .then((response) => {           
+              console.log('COMPANION: response received');
 
-// Raw data fetching
-Data.getData = function(cacheOnly) {
-  if (cacheOnly) {
-    let cgmData = Data.storage.load();
+              return response.json();
+          })
+          .then((data) => {
+            console.log('COMPANION: json received');
+            logDebugInfo(data, 'new data fetched');
 
-    return new Promise(function(resolve, reject) {
-      if (   (!!cgmData)
-          && (cgmData.length > 0)
-          && (cgmData[0])) {
-        logDebugInfo(cgmData, 'cached data');
-     
-        resolve(cgmData);
-      } else {
-        // Since we're not willing to wait for fresh data, we have
-        // no data we can provide. Resolve the promise accordingly.
-        resolve({});
-      }
-    });
-  } else { // !cacheOnly
-    return new Promise(function(resolve, reject) {
-      fetchNewData(resolve, reject, 'fetching new data');
-    });
-  }
+            resolve(data);
+          })
+          .catch((error) => {
+            console.log('COMPANION: fetch error - ' + error);
+            reject(error);
+          })
+        });
+  });
 }
 
 // Data analysis
-Data.getAnalyzedData = function(cacheOnly) {
+Data.getAnalyzedData = function() {
   return new Promise(function(resolve, reject) {
-    Data
-      .getData(cacheOnly)
-      .then(
-        (data) => {
-          let result = packageErrorInfo(DataConstants.noData);
+    fetchNewData()
+    .then(
+      (data) => {
+        let result = packageErrorInfo(DataConstants.noData);
 
-          if (   (!!data)
-              && (data.length > 0) ) {
-            let latestValue = data[0];
+        if (   (!!data)
+            && (data.length > 0) ) {
+          let latestValue = data[0];
 
-            result = 
-              packageInfo(
-                latestValue.Value,
-                getTimestamp(latestValue),
-                latestValue.Trend,
-                data,
-                DataConstants.noError);
-          }
-
-          resolve(result);
-        })
-      .catch(
-        (errorInfo) => {
-          console.log('COMPANION: error in geting data - ' + errorInfo);
-          
-          result = packageErrorInfo(DataConstants.noData, errorInfo);
-          
-          resolve(result);
+          result = 
+            packageInfo(
+              latestValue.Value,
+              getTimestamp(latestValue),
+              latestValue.Trend,
+              data,
+              DataConstants.noError);
         }
-      );
+
+        resolve(result);
+      })
+    .catch(
+      (errorInfo) => {
+        console.log('COMPANION: error in geting data - ' + errorInfo);
+
+        let result = packageErrorInfo(DataConstants.noData, errorInfo);
+
+        resolve(result);
+      }
+    );
   });
 }
                      
